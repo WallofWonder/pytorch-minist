@@ -1,4 +1,3 @@
-import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,14 +10,22 @@ class Network(nn.Module):
     def __init__(self):
         super(Network, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=20, kernel_size=5, stride=1)
-        self.fc1 = nn.Linear(in_features=20 * 12 * 12, out_features=100)
-        self.fc2 = nn.Linear(100, 10)
+        self.conv2 = nn.Conv2d(in_channels=20, out_channels=40, kernel_size=5, stride=1)
+        self.fc1 = nn.Linear(in_features=40 * 4 * 4, out_features=1000)
+        self.fc2 = nn.Linear(1000, 10)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, 2, 2)  # kernel_size=2, stride=2，pooling之后的大小除以2
-        x = x.view(-1, 20 * 12 * 12)  # 展开为行向量
+
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+
+        x = x.view(-1, 40 * 4 * 4)  # 展开为行向量
+
         x = F.relu(self.fc1(x))
+
+        x = F.dropout(input=x, p=0.5, training=self.training)
         x = self.fc2(x)
         x = F.log_softmax(x, dim=1)  # 按行进行log(softmax(x))
         return x
@@ -104,6 +111,8 @@ def train(log_interval, network, device, train_loader, batch_size_train, train_l
             train_losses.append(loss.item())
             train_counter.append(
                 (batch_idx * batch_size_train) + ((epoch - 1) * len(train_loader.dataset)))
+            torch.save(network.state_dict(), 'results/model.pth')
+            torch.save(optimizer.state_dict(), 'results/optimizer.pth')
 
 
 # 测试
@@ -137,6 +146,27 @@ def test(network, device, test_loader, test_losses):
         100. * correct / len(test_loader.dataset)))
 
 
+def drawFig(train_counter, train_losses, test_counter, test_losses):
+    """
+    绘图
+
+    :param train_counter:
+    :param train_losses:
+    :param test_counter:
+    :param test_losses:
+    :return:
+    """
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+    plt.plot(train_counter, train_losses, color='blue')
+    plt.scatter(test_counter, test_losses, color='red')
+    plt.legend(['Train Loss', 'Test Loss'], loc='upper right')
+    plt.xlabel('number of training examples seen')
+    plt.ylabel('negative log likelihood loss')
+    plt.show()
+
+
 if __name__ == '__main__':
     n_epochs = 3
     batch_size_train = 64
@@ -166,18 +196,29 @@ if __name__ == '__main__':
     network = Network().to(device)
     optimizer = optim.SGD(network.parameters(), lr=learning_rate, momentum=momentum)
 
+    test(network, device, test_loader, test_losses)
     for epoch in range(1, n_epochs + 1):
         train(log_interval, network, device, train_loader, batch_size_train, train_losses, train_counter, optimizer,
               epoch)
         test(network, device, test_loader, test_losses)
 
-    # 绘图
-    import matplotlib.pyplot as plt
+    drawFig(train_counter, train_losses, test_counter, test_losses)
 
-    plt.figure()
-    plt.plot(train_counter, train_losses, color='blue')
-    plt.scatter(test_counter[1:], test_losses, color='red')
-    plt.legend(['Train Loss', 'Test Loss'], loc='upper right')
-    plt.xlabel('number of training examples seen')
-    plt.ylabel('negative log likelihood loss')
-    plt.show()
+    if input('Continue training?(y/n)') == 'y':
+        continued_network = Network()
+        continued_optimizer = optim.SGD(network.parameters(), lr=learning_rate,
+                                        momentum=momentum)
+        network_state_dict = torch.load('results/model.pth')
+        continued_network.load_state_dict(network_state_dict)
+
+        optimizer_state_dict = torch.load('results/optimizer.pth')
+        continued_optimizer.load_state_dict(optimizer_state_dict)
+
+        for epoch in range(4, 9):
+            test_counter.append(epoch * len(train_loader.dataset))
+            train(log_interval, network, device, train_loader, batch_size_train, train_losses, train_counter, optimizer,
+                  epoch)
+            test(network, device, test_loader, test_losses)
+
+        drawFig(train_counter, train_losses, test_counter, test_losses)
+

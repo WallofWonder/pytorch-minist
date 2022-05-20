@@ -77,19 +77,10 @@ def data_loader(batch_size, batch_size_test, use_cuda=False):
 
 
 # 训练脚本
-def train(log_interval, network, device, train_loader, batch_size_train, train_losses, train_counter, optimizer, epoch):
+def train():
     """
     训练过程
 
-    :param log_interval: 计算训练效果的间隔
-    :param network: 网络模型
-    :param device: 使用的设备 CPU or GPU
-    :param train_loader: 训练集
-    :param batch_size_train: 批次大小
-    :param train_losses: 记录损失变化
-    :param train_counter: 记录训练次数
-    :param optimizer: 优化器
-    :param epoch: 当前的迭代次数
     :return: null
     """
     network.train()
@@ -107,9 +98,8 @@ def train(log_interval, network, device, train_loader, batch_size_train, train_l
         optimizer.step()
         # 每经过一个log_interval大小的间隔，记录一下训练效果
         if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item()))
+            print('Train Epoch: {} ({:.0f}%)\tLoss: {:.6f}'.format(
+                epoch, 100. * batch_idx / len(train_loader), loss.item()))
             train_losses.append(loss.item())
             train_counter.append(
                 (batch_idx * batch_size_train) + ((epoch - 1) * len(train_loader.dataset)))
@@ -118,15 +108,10 @@ def train(log_interval, network, device, train_loader, batch_size_train, train_l
 
 
 # 测试
-def test(network, device, test_loader, test_losses, accuracies=None):
+def test():
     """
     测试过程
 
-    :param accuracies: 记录每次迭代的精确度
-    :param network: 网络模型
-    :param device: 测试使用的设备
-    :param test_loader: 测试集
-    :param test_losses: 记录损失变化
     :return: null
     """
     network.eval()
@@ -151,14 +136,10 @@ def test(network, device, test_loader, test_losses, accuracies=None):
     accuracies.append(100. * correct / len(test_loader.dataset))
 
 
-def drawFig(train_counter, train_losses, test_counter, test_losses):
+def drawFig():
     """
     绘图
 
-    :param train_counter:
-    :param train_losses:
-    :param test_counter:
-    :param test_losses:
     :return:
     """
     import matplotlib.pyplot as plt
@@ -167,20 +148,38 @@ def drawFig(train_counter, train_losses, test_counter, test_losses):
     plt.plot(train_counter[:len(train_losses)], train_losses, color='blue')
     plt.scatter(test_counter[:len(test_losses)], test_losses, color='red')
     plt.legend(['Train Loss', 'Test Loss'], loc='upper right')
-    plt.xlabel('number of training examples seen')
-    plt.ylabel('negative log likelihood loss')
+    plt.title('Loss on the training tata')
+    plt.xlabel('number of training examples')
+    plt.ylabel('loss')
+    plt.show()
+
+    plt.figure()
+    plt.plot(range(len(accuracies)), accuracies)
+    plt.title('Accuracy(%) on the test data')
+    plt.xlabel('epoch of test')
+    plt.ylabel('accuracy')
     plt.show()
 
 
-if __name__ == '__main__':
-    n_epochs = 20
-    batch_size_train = 64
-    batch_size_test = 1000
-    learning_rate = 0.01
-    momentum = 0.5
-    log_interval = 10
+n_epochs = 100
+batch_size_train = 64
+batch_size_test = 1000
+learning_rate = 0.01
+momentum = 0.5
+log_interval = 10
 
-    random_seed = 1
+random_seed = 1
+
+train_loader, test_loader = None, None
+train_losses = []
+train_counter = []
+test_losses = []
+test_counter = []
+accuracies = []
+max_acc = 0.0
+max_interval = 5
+
+if __name__ == '__main__':
 
     # 启用英伟达cuDNN加速框架和CUDA
     torch.backends.cudnn.enabled = True
@@ -192,24 +191,16 @@ if __name__ == '__main__':
     # 加载数据
     train_loader, test_loader = data_loader(batch_size=batch_size_train, batch_size_test=batch_size_test,
                                             use_cuda=use_cuda)
-
-    train_losses = []
-    train_counter = []
-    test_losses = []
     test_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
-    accuracies = []
-    max_acc = 0.
-    max_interval = 3
 
     network = Network().to(device)
     optimizer = optim.SGD(network.parameters(), lr=learning_rate, momentum=momentum)
 
-    test(network, device, test_loader, test_losses, accuracies)
+    test()
     max_acc = max(max_acc, accuracies[-1])
     for epoch in range(1, n_epochs + 1):
-        train(log_interval, network, device, train_loader, batch_size_train, train_losses, train_counter, optimizer,
-              epoch)
-        test(network, device, test_loader, test_losses, accuracies)
+        train()
+        test()
 
         max_acc = max(max_acc, accuracies[-1])
         print('Max accuracy: {:.2f}%\n'.format(max_acc))
@@ -217,7 +208,7 @@ if __name__ == '__main__':
             print('No progress, stop training.')
             break
 
-    drawFig(train_counter, train_losses, test_counter, test_losses)
+    drawFig()
 
     # if input('Continue training?(y/n)') == 'y':
     #     continued_network = Network()

@@ -29,7 +29,7 @@ class Network(nn.Module):
         x = F.dropout(input=x, p=0.5, training=self.training)  # 弃权， 一半的神经元
 
         x = self.fc2(x)
-        x = F.log_softmax(x, dim=1)  # 按行进行log(softmax(x))
+        # x = F.log_softmax(x, dim=1)  # 按行进行log(softmax(x))
         return x
 
 
@@ -91,7 +91,7 @@ def train():
         # 前向计算出预测输出
         output = network(data)
         # 对数似然代价
-        loss = F.nll_loss(output, target)
+        loss = F.cross_entropy(output, target)
         # 求梯度
         loss.backward()
         # 更新参数
@@ -121,7 +121,7 @@ def test():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = network(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()
+            test_loss += F.cross_entropy(output, target, reduction='sum').item()
             predict = output.argmax(dim=1, keepdim=True)
             correct += predict.eq(target.view_as(predict)).sum().item()
 

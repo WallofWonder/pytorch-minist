@@ -90,7 +90,7 @@ def train():
         optimizer.zero_grad()
         # 前向计算出预测输出
         output = network(data)
-        # 对数似然代价
+        # 代价
         loss = F.cross_entropy(output, target)
         # 求梯度
         loss.backward()
@@ -154,7 +154,7 @@ def drawFig():
     plt.show()
 
     plt.figure()
-    plt.plot(range(len(accuracies)), accuracies)
+    plt.plot(range(len(accuracies) - 1), accuracies[1:])
     plt.title('Accuracy(%) on the test data')
     plt.xlabel('epoch of test')
     plt.ylabel('accuracy')
@@ -166,6 +166,7 @@ batch_size_train = 64
 batch_size_test = 1000
 learning_rate = 0.01
 momentum = 0.5
+weight_decay = 0.1
 log_interval = 10
 
 random_seed = 1
